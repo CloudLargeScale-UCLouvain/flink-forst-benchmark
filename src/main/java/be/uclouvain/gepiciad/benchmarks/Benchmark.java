@@ -3,6 +3,7 @@ package be.uclouvain.gepiciad.benchmarks;
 import be.uclouvain.gepiciad.sources.Event;
 import be.uclouvain.gepiciad.sources.EventSource;
 import org.apache.flink.api.common.functions.OpenContext;
+import org.apache.flink.api.common.functions.RichFlatMapFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.state.v2.ValueState;
 import org.apache.flink.api.common.state.v2.ValueStateDescriptor;
@@ -12,6 +13,7 @@ import org.apache.flink.configuration.StateBackendOptions;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.v2.DiscardingSink;
 import org.apache.flink.streaming.api.functions.source.legacy.SourceFunction;
+import org.apache.flink.util.Collector;
 import org.apache.flink.util.ParameterTool;
 
 import java.util.concurrent.atomic.AtomicReference;
@@ -23,17 +25,17 @@ public class Benchmark {
 
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-        env.configure(new Configuration().set(
-                StateBackendOptions.STATE_BACKEND,
-                pt.get("state-backend", "rocksdb")
-        )); // "rocksdb" or "forst"
+//        env.configure(new Configuration().set(
+//                StateBackendOptions.STATE_BACKEND,
+//                pt.get("state-backend", "rocksdb")
+//        )); // "rocksdb" or "forst"
 
         env.addSource(createEventSource(pt))
                 .name("Source")
                 .uid("Source")
                 .keyBy(Event::getKey)
                 .enableAsyncState()
-                .map(new Mapper())
+                .flatMap(new Mapper())
                 .sinkTo(new DiscardingSink<>());
 
         env.execute("Simple Benchmark");
@@ -46,7 +48,7 @@ public class Benchmark {
         );
     }
 
-    public static class Mapper extends RichMapFunction<Event, String> {
+    public static class Mapper extends RichFlatMapFunction<Event, String> {
 
         private static final long serialVersionUID = 1L;
 
@@ -64,13 +66,15 @@ public class Benchmark {
         }
 
         @Override
-        public String map(Event event) throws Exception {
-            AtomicReference<String> res = new AtomicReference<>();
+        public void flatMap(Event event, Collector<String> out) throws Exception {
             valueState.asyncValue().thenAccept(currentValue -> {
-                res.set(currentValue);
+                if (currentValue != null) {
+                    out.collect(currentValue);
+                }
                 valueState.asyncUpdate(event.getPayload());
             });
-            return res.get();
         }
+
+
     }
 }

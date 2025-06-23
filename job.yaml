@@ -1,0 +1,35 @@
+
+apiVersion: flink.apache.org/v1beta1
+kind: FlinkDeployment
+metadata:
+  name: flink
+spec:
+  image: alugand/flink:2.0.9
+  flinkVersion: v2_0
+  flinkConfiguration:
+    taskmanager.numberOfTaskSlots: "2"
+    state.backend.type: forst
+    execution.checkpointing.incremental: "true"
+    execution.checkpointing.interval: "30s"
+    execution.checkpointing.dir: "s3://mybucket/flink-checkpoints"
+    s3.endpoint: "https://myminio-hl.minio-tenant:9000"
+    s3.path.style.access: "true"
+    s3.access-key: "minio"
+    s3.secret-key: "minio123"
+  serviceAccount: flink
+  jobManager:
+    resource:
+      memory: "2048m"
+      cpu: 1
+  taskManager:
+    resource:
+      memory: "2048m"
+      cpu: 1
+  job:
+    jarURI: local:///opt/flink/usrlib/flink-forst.jar
+    #args:
+    #  - "--keyspace"
+    #  - "10000"
+    #  - "--payload-size"
+    #  - "500"
+    parallelism: 2
